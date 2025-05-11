@@ -10,22 +10,36 @@ from .menu import catalog
 from filters import IsUser
 
 
-@dp.message_handler(IsUser(), text=catalog)
+@dp.message_handler(IsUser(), text='🛍️ Каталог')
 async def process_catalog(message: Message):
-    await message.answer('Выберите раздел, чтобы вывести список товаров:',
-                         reply_markup=categories_markup())
+    categories = db.fetchall('SELECT * FROM categories')  # Ensure categories are fetched
+    if not categories:
+        await message.answer("No categories available at the moment.")
+        return
+    await message.answer('Choose a category to view products:', reply_markup=categories_markup())
 
 
 @dp.callback_query_handler(IsUser(), category_cb.filter(action='view'))
 async def category_callback_handler(query: CallbackQuery, callback_data: dict):
+    products = db.fetchall('''SELECT * FROM products WHERE tag = (
+        SELECT title FROM categories WHERE idx = ?)''', (callback_data['id'],))
 
-    products = db.fetchall('''SELECT * FROM products product
-    WHERE product.tag = (SELECT title FROM categories WHERE idx=?) 
-    AND product.idx NOT IN (SELECT idx FROM cart WHERE cid = ?)''',
-                           (callback_data['id'], query.message.chat.id))
+    if not products:
+        await query.answer("No products found in this category.", show_alert=True)
+        return
 
-    await query.answer('Все доступные товары.')
+    await query.answer('Displaying products...')
     await show_products(query.message, products)
+
+async def show_products(m, products):
+    if len(products) == 0:
+        await m.answer('No products available in this category 😢')
+    else:
+        await bot.send_chat_action(m.chat.id, ChatActions.TYPING)
+        for idx, title, body, image, price, _ in products:
+            markup = product_markup(idx, price)
+            text = f"<b>{title}</b>\n\n{body}\n\nPrice: {price}₽"
+            await m.answer_photo(photo=image, caption=text, reply_markup=markup)
 
 
 @dp.callback_query_handler(IsUser(), product_cb.filter(action='add'))
@@ -39,20 +53,13 @@ async def add_product_callback_handler(query: CallbackQuery, callback_data: dict
 
 
 async def show_products(m, products):
-
     if len(products) == 0:
-
-        await m.answer('Здесь ничего нет 😢')
-
+        await m.answer('No products available in this category 😢')
     else:
-
         await bot.send_chat_action(m.chat.id, ChatActions.TYPING)
-
         for idx, title, body, image, price, _ in products:
-
             markup = product_markup(idx, price)
-            text = f'<b>{title}</b>\n\n{body}'
-
-            await m.answer_photo(photo=image,
-                                 caption=text,
-                                 reply_markup=markup)
+            text = f"<b>{title}</b>\n\n{body}\n\nPrice: {price}₽"
+            
+            # Send each product with its inline keyboard
+            await m.answer_photo(photo=image, caption=text, reply_markup=markup)
