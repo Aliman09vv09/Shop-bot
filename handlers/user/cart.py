@@ -9,6 +9,7 @@ from states import CheckoutState
 from loader import dp, db, bot
 from filters import IsUser
 from .menu import cart
+from states.payment_state import PaymentState
 
 
 @dp.message_handler(IsUser(), text=cart)
@@ -128,6 +129,14 @@ async def checkout(message, state):
 
     await message.answer(f'{answer}\nОбщая сумма заказа: {total_price}₽.',
                          reply_markup=check_markup())
+    
+
+@dp.message_handler(IsUser(), text="🛒 Proceed to Payment")
+async def process_payment(message: Message, state: FSMContext):
+    markup = ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add("Bank Transfer", "Crypto (TRX/USDT)")
+    await PaymentState.method.set()
+    await message.answer("Choose a payment method:", reply_markup=markup)
 
 
 @dp.message_handler(IsUser(), lambda message: message.text not in [all_right_message, back_message], state=CheckoutState.check_cart)
@@ -148,58 +157,6 @@ async def process_check_cart_all_right(message: Message, state: FSMContext):
                          reply_markup=back_markup())
 
 
-@dp.message_handler(IsUser(), text=back_message, state=CheckoutState.name)
-async def process_name_back(message: Message, state: FSMContext):
-    await CheckoutState.check_cart.set()
-    await checkout(message, state)
-
-
-@dp.message_handler(IsUser(), state=CheckoutState.name)
-async def process_name(message: Message, state: FSMContext):
-
-    async with state.proxy() as data:
-
-        data['name'] = message.text
-
-        if 'address' in data.keys():
-
-            await confirm(message)
-            await CheckoutState.confirm.set()
-
-        else:
-
-            await CheckoutState.next()
-            await message.answer('Укажите свой адрес места жительства.',
-                                 reply_markup=back_markup())
-
-
-@dp.message_handler(IsUser(), text=back_message, state=CheckoutState.address)
-async def process_address_back(message: Message, state: FSMContext):
-
-    async with state.proxy() as data:
-
-        await message.answer('Изменить имя с <b>' + data['name'] + '</b>?',
-                             reply_markup=back_markup())
-
-    await CheckoutState.name.set()
-
-
-@dp.message_handler(IsUser(), state=CheckoutState.address)
-async def process_address(message: Message, state: FSMContext):
-
-    async with state.proxy() as data:
-        data['address'] = message.text
-
-    await confirm(message)
-    await CheckoutState.next()
-
-
-async def confirm(message):
-
-    await message.answer('Убедитесь, что все правильно оформлено и подтвердите заказ.',
-                         reply_markup=confirm_markup())
-
-
 @dp.message_handler(IsUser(), lambda message: message.text not in [confirm_message, back_message], state=CheckoutState.confirm)
 async def process_confirm_invalid(message: Message):
     await message.reply('Такого варианта не было.')
@@ -217,31 +174,31 @@ async def process_confirm(message: Message, state: FSMContext):
 
 @dp.message_handler(IsUser(), text=confirm_message, state=CheckoutState.confirm)
 async def process_confirm(message: Message, state: FSMContext):
-
-    enough_money = True  # enough money on the balance sheet
     markup = ReplyKeyboardRemove()
 
-    if enough_money:
-
-        logging.info('Deal was made.')
-
-        async with state.proxy() as data:
-
-            cid = message.chat.id
-            products = [idx + '=' + str(quantity)
-                        for idx, quantity in db.fetchall('''SELECT idx, quantity FROM cart
+    async with state.proxy() as data:
+        cid = message.chat.id
+        products = [idx + '=' + str(quantity)
+                    for idx, quantity in db.fetchall('''SELECT idx, quantity FROM cart
             WHERE cid=?''', (cid,))]  # idx=quantity
 
-            db.query('INSERT INTO orders VALUES (?, ?, ?, ?)',
-                     (cid, data['name'], data['address'], ' '.join(products)))
+        # Ensure all 7 columns are handled in the INSERT query
+        db.query('INSERT INTO orders (cid, usr_name, usr_address, products, payment_method, payment_data, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
+                 (
+                     cid,
+                     data.get('name', ''),  # Optional, default to empty if not provided
+                     data.get('address', ''),  # Optional, default to empty if not provided
+                     ' '.join(products),
+                     None,  # payment_method (initially NULL)
+                     None,  # payment_data (initially NULL)
+                     'Pending'  # status (default to 'Pending')
+                 ))
 
-            db.query('DELETE FROM cart WHERE cid=?', (cid,))
+        # Clear the cart after order placement
+        db.query('DELETE FROM cart WHERE cid=?', (cid,))
 
-            await message.answer('Ок! Ваш заказ уже в пути 🚀\nИмя: <b>' + data['name'] + '</b>\nАдрес: <b>' + data['address'] + '</b>',
-                                 reply_markup=markup)
-    else:
-
-        await message.answer('У вас недостаточно денег на счете. Пополните баланс!',
-                             reply_markup=markup)
+        await message.answer('✅ Your order has been placed! 🚀', reply_markup=markup)
+    await CheckoutState.confirm.set()
+    await message.answer('Please confirm your order:', reply_markup=confirm_markup())
 
     await state.finish()
