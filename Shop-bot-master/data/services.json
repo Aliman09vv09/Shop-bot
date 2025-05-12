@@ -1,0 +1,21 @@
+{
+  "services": [
+    { "id": 1, "title": "Gold Multi", "price_range": "600,000 to 1,100,000 IRR" },
+    { "id": 2, "title": "Gold Zombie", "price_range": "700,000 to 1,200,000 IRR" },
+    { "id": 3, "title": "Gold Warzone", "price_range": "1,700,000 to 2,200,000 IRR" },
+    { "id": 4, "title": "Terminus", "price": "3,400,000 IRR" },
+    { "id": 5, "title": "Citadel", "price": "4,400,000 IRR" },
+    { "id": 6, "title": "Max + Gold", "price_range": "1,300,000 to 1,800,000 IRR" },
+    { "id": 7, "title": "Max Level Gun", "price": "1,000,000 IRR" },
+    { "id": 8, "title": "Full Gold", "price": "24,000,000 IRR" },
+    { "id": 9, "title": "Diamond", "price_range": "650,000 to 1,150,000 IRR" },
+    { "id": 10, "title": "Opal", "price_range": "700,000 to 1,200,000 IRR" },
+    { "id": 11, "title": "Darkspine", "price_range": "700,000 to 1,200,000 IRR" },
+    { "id": 12, "title": "Afterlife", "price_range": "800,000 to 1,300,000 IRR" },
+    { "id": 13, "title": "Dark Matter", "price_range": "1,100,000 to 1,600,000 IRR" },
+    { "id": 14, "title": "Full Dark Matter", "price": "74,000,000 IRR" },
+    { "id": 15, "title": "Nebula", "price_range": "1,200,000 to 1,700,000 IRR" },
+    { "id": 16, "title": "Events / Challenges", "price_range": "1,000,000 to 4,000,000 IRR" },
+    { "id": 17, "title": "Battle Pass Page Unlock", "price": "700,000 IRR" }
+  ]
+}
